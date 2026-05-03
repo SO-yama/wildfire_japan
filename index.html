@@ -208,12 +208,13 @@ async function reloadFIRMS() {
   showToast('<span class="spin"></span> 大槌町周辺データを取得中...');
   const sources = Array.from(document.querySelectorAll('.src-cb:checked')).map(c => c.value);
   const area = '122,24,146,46'; 
-  const days = '5';  // ← ここを5に修正（API仕様対応）
+  const days = '5';   // API仕様対応（最大5日）
   let allRows = [];
   for (const source of sources) {
     const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_KEY}/${source}/${area}/${days}/${endDateStr}`;
     try {
       const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       const rows = parseCSV(text).map(r => {
         const jst = robustConvertToJST(r.acq_date, r.acq_time);
@@ -222,7 +223,9 @@ async function reloadFIRMS() {
         };
       });
       allRows = allRows.concat(rows);
-    } catch (e) { console.error(source, e); }
+    } catch (e) { 
+      console.error(source, e); 
+    }
   }
   if (allRows.length === 0) {
     lastRows = generateOtsuchiDemo(endDateStr);
@@ -359,7 +362,6 @@ window.addEventListener('load', () => {
   syncTimelineUI(); 
   reloadFIRMS(); 
   
-  // モバイルメニュー
   const sidebar = document.getElementById('sidebar');
   document.getElementById('sidebar-toggle').addEventListener('click', () => {
     sidebar.classList.toggle('active');
