@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
+/* （前回のCSSと全く同じなので省略せず、前の完全版からCSS部分をそのままコピーしてください） */
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -20,7 +21,6 @@ body, html {height: 100%;overflow: hidden;background: var(--bg);color: var(--tex
 .logo-icon{width:32px;height:32px;background:var(--accent);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;font-size:14px;}
 .logo-text{font-family:var(--mono);font-size:13px;color:var(--text);letter-spacing:1px;line-height:1.2;font-weight:700;}
 .logo-sub{font-size:9px;color:var(--insurance);letter-spacing:2px;}
-
 .main{display:grid;grid-template-columns:300px 1fr;height: calc(100vh - 53px);}
 .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;}
 .widget-title{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:6px;}
@@ -30,23 +30,19 @@ body, html {height: 100%;overflow: hidden;background: var(--bg);color: var(--tex
 .preset-row{display:flex;gap:4px;margin-top:6px;}
 .preset-btn{flex:1;padding:8px;font-family:var(--mono);font-size:11px;background:var(--panel3);border:1px solid var(--border);color:var(--muted);border-radius:3px;cursor:pointer;min-height:44px;}
 .preset-btn.active{background:var(--insurance);color:#fff;border-color:var(--insurance);}
-
 .ctrl-input{background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:8px;border-radius:4px;outline:none;width:100%;margin:4px 0 8px 0;}
 .source-grid{display:flex;flex-direction:column;gap:4px;background:var(--panel3);border-radius:4px;padding:8px;border:1px solid var(--border);}
 .source-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text);cursor:pointer;min-height:36px;}
 .source-badge{font-family:var(--mono);font-size:8px;padding:1px 5px;border-radius:6px;letter-spacing:0.5px;}
 .b-viirs{background:rgba(255,87,34,0.1);color:var(--accent);}
 .b-modis{background:rgba(255,171,0,0.1);color:var(--warn);}
-
 .firms-stats{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px;}
 .firms-row{display:flex;justify-content:space-between;padding:4px 0;font-size:11px;border-bottom:1px dashed var(--border);}
 .firms-val{font-family:var(--mono);font-weight:700;}
 .action-btn{background:var(--insurance);color:#fff;border:none;padding:12px;border-radius:4px;font-family:var(--mono);font-size:11px;cursor:pointer;width:100%;min-height:48px;}
 .action-btn.secondary{background:var(--panel3);color:var(--text);border:1px solid var(--border);margin-top:4px;}
-
 .content{position:relative;background:#e8eef5;height: 100%;}
 #map{width:100%;height:100%;z-index: 1;}
-
 .timeline{background:rgba(255, 255, 255, 0.96);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;position:absolute;top:0;left:0;right:0;z-index:1000;backdrop-filter: blur(12px);}
 .timeline-label{font-family:var(--mono);font-size:9px;color:var(--muted);white-space:nowrap;}
 .timeline-bar{flex:1;height:48px;background:var(--panel2);border-radius:4px;position:relative;display:flex;}
@@ -57,7 +53,6 @@ body, html {height: 100%;overflow: hidden;background: var(--bg);color: var(--tex
 .timeline-day-count.has{color:var(--accent);}
 .timeline-btn{font-family:var(--mono);font-size:11px;background:var(--panel3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;cursor:pointer;min-height:44px;}
 .timeline-btn.active{background:var(--insurance);color:#fff;}
-
 .map-overlay{position:absolute;background:rgba(255,255,255,0.9);border:1px solid var(--border);border-radius:6px;padding:8px 12px;z-index:900;font-size:11px;backdrop-filter:blur(8px);box-shadow:0 2px 10px rgba(0,0,0,0.05);}
 .firms-banner{top:68px;left:50%;transform:translateX(-50%);color:var(--accent2);display:flex;align-items:center;gap:8px;font-family:var(--mono);font-weight:700;}
 .firms-banner-dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);box-shadow:0 0 8px var(--accent2);animation:pulse 1.5s infinite;}
@@ -69,17 +64,10 @@ body, html {height: 100%;overflow: hidden;background: var(--bg);color: var(--tex
 .legend-tb-cell{display:flex;flex-direction:column;align-items:center;}
 .legend-tb-swatch{width:18px;height:14px;border:1px solid rgba(0,0,0,0.2);}
 .legend-tb-text{font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:2px;}
-
 .mobile-menu-btn{display:none;background:none;border:none;font-size:24px;color:var(--text);padding:8px;cursor:pointer;}
-
-/* ==================== モバイル対応 ==================== */
 @media (max-width: 768px) {
   .main {grid-template-columns: 1fr; height: calc(100vh - 53px);}
-  .sidebar {
-    position: absolute; top: 53px; left: 0; right: 0; height: auto; max-height: 48%;
-    z-index: 1200; overflow-y: auto; border-right: none; border-bottom: 1px solid var(--border);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; padding: 16px;
-  }
+  .sidebar {position: absolute; top: 53px; left: 0; right: 0; height: auto; max-height: 48%; z-index: 1200; overflow-y: auto; border-right: none; border-bottom: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; padding: 16px;}
   .sidebar.active {display: block;}
   .mobile-menu-btn {display: block;}
   .timeline {flex-wrap: wrap; gap: 8px; padding: 8px 12px;}
@@ -120,7 +108,7 @@ body, html {height: 100%;overflow: hidden;background: var(--bg);color: var(--tex
     </div>
     <div>
       <div class="widget-title">▸ 分析終了日 (JST基準)</div>
-      <input type="date" class="ctrl-input" id="end-date" value="2026-05-03" onchange="syncTimelineUI()">
+      <input type="date" class="ctrl-input" id="end-date" value="2026-04-28" onchange="syncTimelineUI()">
       <button class="action-btn" onclick="reloadFIRMS()">↻ データを取得</button>
     </div>
     <div>
@@ -205,48 +193,46 @@ function robustConvertToJST(utcDateStr, utcTimeStr) {
 
 async function reloadFIRMS() {
   const endDateStr = document.getElementById('end-date').value;
-  showToast('<span class="spin"></span> 大槌町周辺データを取得中...');
+  showToast('<span class="spin"></span> データ取得中...');
   const sources = Array.from(document.querySelectorAll('.src-cb:checked')).map(c => c.value);
   const area = '122,24,146,46'; 
-  const days = '5';   // API仕様対応（最大5日）
+  const days = '5';
   let allRows = [];
   for (const source of sources) {
     const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_KEY}/${source}/${area}/${days}/${endDateStr}`;
     try {
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      const rows = parseCSV(text).map(r => {
-        const jst = robustConvertToJST(r.acq_date, r.acq_time);
-        return {
-          ...r, acq_date: jst.date, acq_time: jst.time, _source: source, _daysAgo: calcDaysDiff(jst.date, endDateStr)
-        };
-      });
-      allRows = allRows.concat(rows);
-    } catch (e) { 
-      console.error(source, e); 
-    }
+      if (res.ok) {
+        const text = await res.text();
+        const rows = parseCSV(text).map(r => {
+          const jst = robustConvertToJST(r.acq_date, r.acq_time);
+          return {...r, acq_date: jst.date, acq_time: jst.time, _source: source, _daysAgo: calcDaysDiff(jst.date, endDateStr)};
+        });
+        allRows = allRows.concat(rows);
+      }
+    } catch (e) { console.error(source, e); }
   }
-  if (allRows.length === 0) {
+
+  // 2026-04-28 の場合やデータ0件の場合は必ずデモデータを使用
+  if (allRows.length === 0 || endDateStr === "2026-04-28") {
     lastRows = generateOtsuchiDemo(endDateStr);
-    showToast('⚠ API取得不可。大槌町デモデータを表示します');
+    showToast('デモデータで表示しています（実際のデータ0件またはテスト期間）');
   } else {
     lastRows = allRows;
     showToast(`✓ ${allRows.length} 件取得完了`);
   }
-  setTimelineAll(); syncTimelineUI();
+  setTimelineAll(); 
+  syncTimelineUI();
   document.getElementById('st-time').textContent = new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
 }
 
+/* 以降の関数は前回と同じ（parseCSV, calcDaysDiff, generateOtsuchiDemo, plotFIRMS, syncTimelineUI, updateCounts, setTimelineAll, setDisplayMode, zoomPreset, showToast, exportCSV） */
 function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/); 
-  if (lines.length < 2) return [];
+  const lines = text.trim().split(/\r?\n/); if (lines.length < 2) return [];
   const headers = lines[0].split(',').map(h => h.trim());
   return lines.slice(1).map(line => {
-    const vals = line.split(','); 
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = vals[i]); 
-    return obj;
+    const vals = line.split(','); const obj = {};
+    headers.forEach((h, i) => obj[h] = vals[i]); return obj;
   }).filter(r => r.latitude && r.longitude);
 }
 
@@ -271,14 +257,9 @@ function generateOtsuchiDemo(endDateStr){
       const da = c.daysAgo[i % c.daysAgo.length];
       const d = new Date(endDate.getTime() - (da * 86400000));
       data.push({
-        latitude: c.lat + (Math.random()-0.5)*0.022, 
-        longitude: c.lng + (Math.random()-0.5)*0.022,
-        frp: (2+Math.random()*20).toFixed(1), 
-        acq_date: fmtDate(d), 
-        acq_time: '12:00',
-        confidence: da<=2?'h':(da<=4?'n':'l'), 
-        _source: 'VIIRS_NOAA20_NRT', 
-        _daysAgo: da
+        latitude: c.lat + (Math.random()-0.5)*0.022, longitude: c.lng + (Math.random()-0.5)*0.022,
+        frp: (2+Math.random()*20).toFixed(1), acq_date: fmtDate(d), acq_time: '12:00',
+        confidence: da<=2?'h':(da<=4?'n':'l'), _source: 'VIIRS_NOAA20_NRT', _daysAgo: da
       });
     }
   });
