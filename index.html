@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Wildfire Japan - リアルタイム火災監視</title>
+
+  <!-- 1. 接続の最適化 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+
+  <!-- 2. 非ブロッキングなCSS・フォントの読み込み -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap">
+
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    :root{ --bg:#1a1a1a; --primary:#e85a1d; --text:#f5f7f9; }
+    body{font-family:'Noto Sans JP', sans-serif; background:var(--bg); color:var(--text); overflow:hidden; height: 100vh; display: flex; flex-direction: column;}
+    
+    .header { background: rgba(0,0,0,0.8); padding: 10px 20px; z-index: 1000; border-bottom: 1px solid var(--primary); }
+    .header-inner { display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 1.2rem; color: var(--primary); font-family: 'Space Mono', monospace; }
+    h1 span { color: #fff; font-size: 0.8rem; margin-left: 10px; opacity: 0.7; }
+    #coord-text { font-family: 'Space Mono', monospace; font-size: 0.8rem; }
+
+    .main { flex: 1; position: relative; }
+    #map { width: 100%; height: 100%; }
+
+    #toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(232, 90, 29, 0.9); color: white; padding: 10px 20px;
+      border-radius: 4px; font-size: 0.9rem; z-index: 2000; display: none;
+    }
+  </style>
+
+  <!-- 3. JavaScriptの非同期化（defer） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" defer></script>
+</head>
+<body>
+  <div id="toast"></div>
+  
+  <header class="header">
+    <div class="header-inner">
+      <h1>Wildfire Japan <span>FIRE SENSE</span></h1>
+      <div id="coord-text">Lat: 0, Lon: 0</div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div id="map"></div>
+  </main>
+
+  <script>
+    /**
+     * NASA APIリクエストのキャッシュラッパー
+     */
+    async function fetchWithCache(url) {
+      const CACHE_NAME = 'firms-api-cache-v1';
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        const cachedResponse = await cache.match(url);
+        if (cachedResponse) {
+          const dateHeader = cachedResponse.headers.get('date');
+          const age = Date.now() - new Date(dateHeader).getTime();
+          if (age < 3600000) return cachedResponse; 
+        }
+        const response = await fetch(url);
+        if (response.ok) cache.put(url, response.clone());
+        return response;
+      } catch (e) {
+        return fetch(url);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      let map, tileLayer, labelLayer;
+      const FIRMS_KEY = '256135fddc6880125a19f6b864539dcc';
+      const coordText = document.getElementById('coord-text');
+      const toast = document.getElementById('toast');
+
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+      }
+
+      function initMap() {
+        // 日本全体が見える初期位置
+        map = L.map('map', {zoomControl: false}).setView([37.0, 137.0], 5);
+        
+        tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 18,
+          attribution: 'Imagery © Esri'
+        }).addTo(map);
+
+        labelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+          pane: 'shadowPane'
+        }).addTo(map);
+
+        map.on('mousemove', (e) => {
+          coordText.textContent = `Lat: ${e.latlng.lat.toFixed(4)}, Lon: ${e.latlng.lng.toFixed(4)}`;
+        });
+      }
+
+      function parseCSV(csv) {
+        const lines = csv.trim().split('\n');
+        if (lines.length < 2) return [];
+        const headers = lines[0].split(',');
+        return lines.slice(1).map(line => {
+          const values = line.split(',');
+          return headers.reduce((obj, header, i) => {
+            obj[header] = values[i];
+            return obj;
+          }, {});
+        });
+      }
+
+      async function reloadFIRMS() {
+        showToast("データを取得中...");
+        // 日本近海の範囲指定 (minLon, minLat, maxLon, maxLat)
+        const area = '122,20,154,50'; 
+        const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_KEY}/VIIRS_SNPP_NRT/${area}/1`;
+
+        try {
+          const response = await fetchWithCache(url);
+          if (!response.ok) throw new Error("Network response was not ok");
+          const csvText = await response.text();
+          const data = parseCSV(csvText);
+          plotFIRMS(data);
+          showToast(`${data.length} 件の火災地点を読み込みました`);
+        } catch (e) {
+          console.error(e);
+          showToast("データの取得に失敗しました");
+        }
+      }
+
+      function plotFIRMS(data) {
+        data.forEach(point => {
+          const lat = parseFloat(point.latitude);
+          const lon = parseFloat(point.longitude);
+          const bright = parseFloat(point.bright_ti4); // 明るさ温度
+
+          if (!isNaN(lat) && !isNaN(lon)) {
+            const marker = L.circleMarker([lat, lon], {
+              radius: 6,
+              color: '#ff4d00',
+              fillColor: '#ff9100',
+              fillOpacity: 0.7,
+              weight: 1
+            }).addTo(map);
+
+            marker.bindPopup(`
+              <strong>火災検知 (VIIRS)</strong><br>
+              時刻: ${point.acq_date} ${point.acq_time} (UTC)<br>
+              信頼度: ${point.confidence}<br>
+              輝度温度: ${bright} K
+            `);
+          }
+        });
+      }
+
+      // アプリケーションの開始
+      window.addEventListener('load', () => {
+        initMap();
+        reloadFIRMS();
+      });
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      }
+    });
+  </script>
+</body>
+</html>
