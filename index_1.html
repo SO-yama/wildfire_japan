@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WILDFIRE INFORMATION — 大槌町林野火災アーカイブ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+
+/* ====================================================
+   CSS 変数（デザイントークン）
+   ==================================================== */
+:root {
+  --bg:       #f5f7fa;
+  --panel:    #ffffff;
+  --panel2:   #f0f3f7;
+  --panel3:   #e4e9ef;
+  --border:   #d4dae3;
+  --accent:   #ff5722;
+  --accent2:  #00b8d4;
+  --purple:   #7c4dff;
+  --warn:     #ffab00;
+  --text:     #2a3540;
+  --muted:    #6b7c8f;
+  --mono:     'Space Mono', monospace;
+  --jp:       'Noto Sans JP', sans-serif;
+  --header-h: 53px;
+}
+
+/* ====================================================
+   リセット & ベース
+   ==================================================== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body, html {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--jp);
+}
+
+/* ====================================================
+   ヘッダー
+   ==================================================== */
+.header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-h);
+  position: relative;
+  z-index: 1100;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.logo-text {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  line-height: 1.2;
+}
+.logo-sub { font-size: 9px; color: var(--purple); letter-spacing: 2px; }
+.mobile-menu-btn {
+  display: none;
+  background: none; border: none;
+  font-size: 24px; color: var(--text);
+  padding: 8px; cursor: pointer;
+}
+
+/* ====================================================
+   レイアウト
+   ==================================================== */
+.main {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  height: calc(100vh - var(--header-h));
+}
+
+/* ====================================================
+   サイドバー
+   ==================================================== */
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.widget-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/* ---- トグル / ボタン群 ---- */
+.mode-toggle {
+  display: flex;
+  background: var(--panel3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px;
+}
+.mode-btn {
+  flex: 1; padding: 8px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+  color: var(--muted); border: none; background: transparent;
+  cursor: pointer; border-radius: 4px;
+  transition: background 0.2s, color 0.2s;
+  min-height: 44px;
+}
+.mode-btn.active { background: var(--accent); color: #fff; }
+
+.preset-row { display: flex; gap: 4px; margin-top: 6px; }
+.preset-btn {
+  flex: 1; padding: 8px;
+  font-family: var(--mono); font-size: 11px;
+  background: var(--panel3); border: 1px solid var(--border);
+  color: var(--muted); border-radius: 3px;
+  cursor: pointer; min-height: 44px;
+}
+.preset-btn.active {
+  background: var(--purple); color: #fff; border-color: var(--purple);
+}
+
+/* ---- 入力コントロール ---- */
+.firms-controls {
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px;
+}
+.ctrl-input {
+  background: var(--panel); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--mono); font-size: 11px;
+  padding: 8px; border-radius: 4px; outline: none;
+  width: 100%; margin: 4px 0 8px;
+}
+
+/* ---- 衛星ソース ---- */
+.source-grid {
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--panel3); border-radius: 4px;
+  padding: 8px; border: 1px solid var(--border);
+}
+.source-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text); cursor: pointer; min-height: 36px;
+}
+.source-badge {
+  font-family: var(--mono); font-size: 8px;
+  padding: 1px 5px; border-radius: 6px; letter-spacing: 0.5px;
+}
+.b-viirs  { background: rgba(255, 87,  34, 0.1); color: var(--accent); }
+.b-modis  { background: rgba(255, 171,  0, 0.1); color: var(--warn);   }
+
+/* ---- 統計 ---- */
+.firms-stats {
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px;
+}
+.firms-row {
+  display: flex; justify-content: space-between;
+  padding: 4px 0; font-size: 11px; border-bottom: 1px dashed var(--border);
+}
+.firms-val { font-family: var(--mono); font-weight: 700; }
+
+/* ---- アクションボタン ---- */
+.action-btn {
+  background: var(--purple); color: #fff; border: none;
+  padding: 12px; border-radius: 4px;
+  font-family: var(--mono); font-size: 11px;
+  cursor: pointer; width: 100%; min-height: 48px;
+}
+.action-btn.secondary {
+  background: var(--panel3); color: var(--text);
+  border: 1px solid var(--border); margin-top: 4px;
+}
+
+/* ====================================================
+   コンテンツ（地図エリア）
+   ==================================================== */
+.content { position: relative; background: #e8eef5; height: 100%; }
+#map { width: 100%; height: 100%; z-index: 1; }
+
+/* ---- タイムライン ---- */
+.timeline {
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex; align-items: center; gap: 12px;
+  position: absolute; top: 0; left: 0; right: 0;
+  z-index: 1000;
+  backdrop-filter: blur(12px);
+}
+.timeline-label {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); white-space: nowrap;
+}
+.timeline-bar {
+  flex: 1; height: 48px; background: var(--panel2);
+  border-radius: 4px; position: relative; display: flex;
+}
+.timeline-day {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  cursor: pointer; border-right: 1px solid var(--border);
+  transition: background 0.2s; min-height: 48px;
+}
+.timeline-day:hover { background: rgba(124, 77, 255, 0.05); }
+.timeline-day.active {
+  background: rgba(124, 77, 255, 0.1);
+  color: var(--purple);
+  border-bottom: 2px solid var(--purple);
+}
+.timeline-day-count { font-size: 13px; color: var(--text); font-weight: 700; }
+.timeline-day-count.has { color: var(--accent); }
+.timeline-btn {
+  font-family: var(--mono); font-size: 11px;
+  background: var(--panel3); border: 1px solid var(--border);
+  color: var(--text); padding: 8px 12px; border-radius: 4px;
+  cursor: pointer; min-height: 44px;
+}
+.timeline-btn.active { background: var(--purple); color: #fff; }
+
+/* ---- 地図オーバーレイ ---- */
+.map-overlay {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 12px;
+  z-index: 900; font-size: 11px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+.firms-banner {
+  top: 68px; left: 50%; transform: translateX(-50%);
+  color: var(--accent2);
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-weight: 700;
+}
+.firms-banner-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent2); box-shadow: 0 0 8px var(--accent2);
+  animation: pulse 1.5s infinite;
+}
+.coord-display { top: 68px; left: 12px; font-family: var(--mono); }
+.coord-display b { color: var(--accent2); }
+
+/* ---- 凡例 ---- */
+.legend-tb { bottom: 12px; left: 12px; }
+.legend-tb-title {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--muted); margin-bottom: 6px;
+}
+.legend-tb-row { display: flex; align-items: center; gap: 4px; }
+.legend-tb-cell { display: flex; flex-direction: column; align-items: center; }
+.legend-tb-swatch {
+  width: 18px; height: 14px; border: 1px solid rgba(0, 0, 0, 0.2);
+}
+.legend-tb-text {
+  font-family: var(--mono); font-size: 8px;
+  color: var(--muted); margin-top: 2px;
+}
+
+/* ====================================================
+   トースト通知
+   ==================================================== */
+.toast {
+  position: fixed; top: 20px; right: 20px;
+  background: var(--panel); color: var(--purple);
+  border: 1px solid var(--purple);
+  padding: 10px 20px; border-radius: 6px;
+  font-size: 11px; z-index: 12000;
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+.toast.show { opacity: 1; }
+
+/* ====================================================
+   アニメーション
+   ==================================================== */
+.spin {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border: 2px solid var(--muted);
+  border-top-color: var(--accent2);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin  { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ====================================================
+   モバイル対応
+   ==================================================== */
+@media (max-width: 768px) {
+  .main { grid-template-columns: 1fr; }
+
+  .sidebar {
+    position: absolute;
+    top: var(--header-h); left: 0; right: 0;
+    height: auto; max-height: 48%;
+    z-index: 1200; overflow-y: auto;
+    border-right: none; border-bottom: 1px solid var(--border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: none; padding: 16px;
+  }
+  .sidebar.active { display: block; }
+  .mobile-menu-btn { display: block; }
+
+  .timeline { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .timeline-bar { height: 52px; }
+
+  .mode-btn, .preset-btn, .action-btn { min-height: 48px; font-size: 13px; }
+
+  .map-overlay    { font-size: 12px; padding: 6px 10px; }
+  .firms-banner  { top: 62px; font-size: 12px; }
+  .coord-display { top: 62px; left: 12px; }
+  .legend-tb     { bottom: 12px; left: 12px; padding: 6px 10px; }
+}
+
+.leaflet-bottom.leaflet-right { margin-bottom: 10px; margin-right: 10px; }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">🔥</div>
+    <div>
+      <div class="logo-text">WILDFIRE INFORMATION</div>
+      <div class="logo-sub">7-DAY ANALYTICS: OTSUCHI REGION</div>
+    </div>
+  </div>
+  <button id="sidebar-toggle" class="mobile-menu-btn" aria-label="メニューを開く">☰</button>
+</header>
+
+<div class="main">
+  <!-- ========== サイドバー ========== -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- 表示モード -->
+    <div>
+      <div class="widget-title">▸ 表示モード</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="mode-poly" data-mode="polygon">PIXEL POLYGON</button>
+        <button class="mode-btn"        id="mode-marker" data-mode="marker">MARKER</button>
+      </div>
+      <div class="preset-row" style="margin-top:6px;">
+        <button class="preset-btn"        data-lat="35.5"   data-lng="138.0"   data-zoom="6">日本全体</button>
+        <button class="preset-btn active" data-lat="39.360" data-lng="141.902" data-zoom="12" id="preset-otsuchi">大槌町</button>
+        <button class="preset-btn"        data-lat="35.36"  data-lng="138.73"  data-zoom="11">富士山麓</button>
+      </div>
+    </div>
+
+    <!-- 分析終了日 -->
+    <div>
+      <div class="widget-title">▸ 分析終了日 (JST基準)</div>
+      <input type="date" class="ctrl-input" id="end-date" value="2026-04-28">
+      <button class="action-btn" id="btn-reload">↻ データを取得</button>
+    </div>
+
+    <!-- 衛星ソース -->
+    <div>
+      <div class="widget-title">▸ 衛星ソース</div>
+      <div class="source-grid">
+        <label class="source-row">
+          <input type="checkbox" class="src-cb" value="LANDSAT_NRT">
+          <span class="source-badge b-landsat">LANDSAT</span> OLI [30m]
+        </label>
+        <label class="source-row">
+          <input type="checkbox" class="src-cb" value="VIIRS_NOAA20_NRT" checked>
+          <span class="source-badge b-viirs">VIIRS</span> NOAA-20
+        </label>
+        <label class="source-row">
+          <input type="checkbox" class="src-cb" value="VIIRS_NOAA21_NRT" checked>
+          <span class="source-badge b-viirs">VIIRS</span> NOAA-21
+        </label>
+        <label class="source-row">
+          <input type="checkbox" class="src-cb" value="VIIRS_SNPP_NRT" checked>
+          <span class="source-badge b-viirs">VIIRS</span> Suomi NPP
+        </label>
+        <label class="source-row">
+          <input type="checkbox" class="src-cb" value="MODIS_NRT" checked>
+          <span class="source-badge b-modis">MODIS</span> 1km (Aqua/Terra)
+        </label>
+      </div>
+    </div>
+
+    <!-- 統計情報 -->
+    <div>
+      <div class="widget-title">▸ 統計情報</div>
+      <div class="firms-stats">
+        <div class="firms-row"><span>期間内合計</span><span class="firms-val" id="st-total">0</span></div>
+        <div class="firms-row"><span>選択日の件数</span><span class="firms-val" id="st-current">0</span></div>
+        <div class="firms-row"><span>最終更新</span><span class="firms-val" id="st-time">--:--</span></div>
+      </div>
+      <button class="action-btn secondary" id="btn-csv">⬇ CSV出力</button>
+    </div>
+
+  </aside>
+
+  <!-- ========== 地図エリア ========== -->
+  <div class="content">
+    <div class="timeline">
+      <div class="timeline-label">表示切替 (JST)</div>
+      <button class="timeline-btn active" id="tl-all">ALL (7日間)</button>
+      <div class="timeline-bar" id="timeline-bar"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="map-overlay coord-display" id="coord-text">
+      Lat: <b>39.360°</b>, Lon: <b>141.902°</b>
+    </div>
+    <div class="map-overlay firms-banner">
+      <div class="firms-banner-dot"></div>
+      <span>NASA FIRMS Advanced Mode (Otsuchi Sync)</span>
+    </div>
+    <div class="map-overlay legend-tb">
+      <div class="legend-tb-title">▸ 経過日数 (DAYS)</div>
+      <div class="legend-tb-row">
+        <div class="legend-tb-cell"><div class="legend-tb-swatch" style="background:#7d0000"></div><div class="legend-tb-text">&lt;1</div></div>
+        <div class="legend-tb-cell"><div class="legend-tb-swatch" style="background:#d62614"></div><div class="legend-tb-text">1-2</div></div>
+        <div class="legend-tb-cell"><div class="legend-tb-swatch" style="background:#e85a1d"></div><div class="legend-tb-text">2-3</div></div>
+        <div class="legend-tb-cell"><div class="legend-tb-swatch" style="background:#f59e2c"></div><div class="legend-tb-text">3-4</div></div>
+        <div class="legend-tb-cell"><div class="legend-tb-swatch" style="background:#fae5b3"></div><div class="legend-tb-text">4-5</div></div>
+        <div class="legend-tb-cell"><div class="legend-tb-swatch" style="background:#fff7df"></div><div class="legend-tb-text">&gt;5</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ======================================================
+   設定 (Config)
+   - ここを変更するだけで動作を調整できる
+   ====================================================== */
+const CONFIG = {
+  DAYS:         7,          // 表示日数（タイムライン幅）
+  DEFAULT_VIEW: { lat: 39.360, lng: 141.902, zoom: 12 },
+  JST_OFFSET_MS: 9 * 60 * 60 * 1000,
+  MS_PER_DAY:    86_400_000,
+
+  // GitHub Actions が生成する静的 JSON のパス
+  // ブラウザは同一オリジンから取得するため CORS 問題なし
+  DATA_JSON: './data/firms_latest.json',
+
+  // 衛星別のピクセルサイズ (度)
+  PIXEL_SIZE: {
+    MODIS: 0.0045,
+    DEFAULT: 0.0017,
+  },
+
+  // 経過日数 → カラー
+  DAY_COLORS: [
+    { maxDays: 1, color: '#7d0000' },
+    { maxDays: 2, color: '#d62614' },
+    { maxDays: 3, color: '#e85a1d' },
+    { maxDays: 4, color: '#f59e2c' },
+    { maxDays: 5, color: '#fae5b3' },
+    { maxDays: Infinity, color: '#fff7df' },
+  ],
+};
+
+/* ======================================================
+   ユーティリティ (Utils)
+   - 副作用のない純粋関数
+   ====================================================== */
+const Utils = {
+  /** Date → "YYYY-MM-DD" */
+  formatDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  },
+
+  /** "YYYY-MM-DD" → Date (00:00:00 JST) */
+  parseDate(str) {
+    return new Date(str.replace(/-/g, '/') + ' 00:00:00');
+  },
+
+  /** UTC日付文字列 + 4桁時刻 → JST の { date, time } */
+  utcToJST(utcDateStr, utcTimeStr) {
+    const t = String(utcTimeStr).padStart(4, '0');
+    const [y, mo, d] = utcDateStr.split('-').map(Number);
+    const hh = parseInt(t.slice(0, 2), 10);
+    const mm = parseInt(t.slice(2, 4), 10);
+    const jst = new Date(Date.UTC(y, mo - 1, d, hh, mm) + CONFIG.JST_OFFSET_MS);
+    return {
+      date: Utils.formatDate(jst),
+      time: jst.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }),
+    };
+  },
+
+  /** 2つの日付文字列の差（日数）。負の場合は 0 */
+  daysDiff(from, to) {
+    const diff = Math.floor(
+      (Utils.parseDate(to) - Utils.parseDate(from)) / CONFIG.MS_PER_DAY
+    );
+    return Math.max(0, diff);
+  },
+
+  /** 経過日数 → 表示色 */
+  colorByDays(daysAgo) {
+    const entry = CONFIG.DAY_COLORS.find(e => daysAgo < e.maxDays);
+    return entry ? entry.color : CONFIG.DAY_COLORS.at(-1).color;
+  },
+
+  /** CSV テキスト → オブジェクト配列 */
+  parseCSV(text) {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim());
+    return lines.slice(1)
+      .map(line => {
+        const vals = line.split(',');
+        return Object.fromEntries(headers.map((h, i) => [h, vals[i]]));
+      })
+      .filter(r => r.latitude && r.longitude);
+  },
+};
+
+/* ======================================================
+   状態管理 (State)
+   - アプリケーション状態を一箇所に集約
+   ====================================================== */
+const State = {
+  rows:              [],   // 全ホットスポットデータ
+  activeDate:        null, // タイムラインで選択中の日付 (null = ALL)
+  displayMode:       'polygon',
+
+  setRows(rows)        { this.rows = rows; },
+  setActiveDate(date)  { this.activeDate = date; },
+  setDisplayMode(mode) { this.displayMode = mode; },
+
+  /** 現在のフィルタ条件で絞り込んだ行を返す */
+  filteredRows() {
+    return this.activeDate
+      ? this.rows.filter(r => r.acq_date === this.activeDate)
+      : this.rows;
+  },
+};
+
+/* ======================================================
+   データ取得層 (DataAPI)
+   - GitHub Actions が生成した静的 JSON を読み込む
+   - 同一オリジン取得なので CORS 問題なし
+   ====================================================== */
+const DataAPI = {
+  _cache: null,   // セッション中はキャッシュを使い回す
+
+  /**
+   * firms_latest.json を取得してキャッシュする。
+   * 既にキャッシュ済みの場合はそれを返す。
+   */
+  async load(forceReload = false) {
+    if (this._cache && !forceReload) return this._cache;
+
+    const res = await fetch(CONFIG.DATA_JSON, {
+      // ブラウザキャッシュを無効化して常に最新を取得
+      cache: 'no-cache',
+    });
+    if (!res.ok) throw new Error(`firms_latest.json の取得失敗: HTTP ${res.status}`);
+
+    this._cache = await res.json();
+    return this._cache;
+  },
+
+  /**
+   * キャッシュ済みデータから endDate の直近 DAYS 日分に絞り込み、
+   * 経過日数（_daysAgo）を再計算して返す。
+   */
+  filterByDate(payload, endDateStr) {
+    const endDate = Utils.parseDate(endDateStr);
+    const cutoff  = new Date(endDate.getTime() - CONFIG.DAYS * CONFIG.MS_PER_DAY);
+
+    return payload.rows
+      .filter(r => {
+        const d = Utils.parseDate(r.acq_date);
+        return d >= cutoff && d <= endDate;
+      })
+      .map(r => ({
+        ...r,
+        _daysAgo: Utils.daysDiff(r.acq_date, endDateStr),
+      }));
+  },
+};
+
+/* ======================================================
+   デモデータ生成
+   - API が取得できないときのフォールバック
+   ====================================================== */
+function generateDemoData(endDateStr) {
+  const endDate = Utils.parseDate(endDateStr);
+  const clusters = [
+    { lat: 39.382, lng: 141.722, n: 14, daysAgo: [2, 3, 4, 5, 6] },
+    { lat: 39.353, lng: 141.798, n: 46, daysAgo: [1, 2, 3, 4, 5, 6] },
+    { lat: 39.345, lng: 141.838, n: 18, daysAgo: [1, 2, 3, 4, 5, 6] },
+    { lat: 39.324, lng: 141.942, n: 22, daysAgo: [0, 1, 2, 3, 4, 5, 6] },
+  ];
+  return clusters.flatMap(c =>
+    Array.from({ length: c.n }, (_, i) => {
+      const da = c.daysAgo[i % c.daysAgo.length];
+      const d  = new Date(endDate.getTime() - da * CONFIG.MS_PER_DAY);
+      return {
+        latitude:  c.lat + (Math.random() - 0.5) * 0.022,
+        longitude: c.lng + (Math.random() - 0.5) * 0.022,
+        frp:       (2 + Math.random() * 20).toFixed(1),
+        acq_date:  Utils.formatDate(d),
+        acq_time:  '12:00',
+        confidence: da <= 2 ? 'h' : da <= 4 ? 'n' : 'l',
+        _source:   'VIIRS_NOAA20_NRT',
+        _daysAgo:  da,
+      };
+    })
+  );
+}
+
+/* ======================================================
+   地図 (MapView)
+   - Leaflet の操作をカプセル化
+   ====================================================== */
+const MapView = {
+  map:        null,
+  firmsLayer: null,
+
+  init() {
+    this.map = L.map('map', { zoomControl: false, tap: true })
+      .setView([CONFIG.DEFAULT_VIEW.lat, CONFIG.DEFAULT_VIEW.lng], CONFIG.DEFAULT_VIEW.zoom);
+
+    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 18 }
+    ).addTo(this.map);
+
+    L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
+      { pane: 'shadowPane', opacity: 0.8 }
+    ).addTo(this.map);
+
+    this.map.on('mousemove', e => {
+      document.getElementById('coord-text').innerHTML =
+        `Lat: <b>${e.latlng.lat.toFixed(3)}°</b>, Lon: <b>${e.latlng.lng.toFixed(3)}°</b>`;
+    });
+
+    window.addEventListener('resize', () =>
+      setTimeout(() => this.map.invalidateSize(), 150)
+    );
+    setTimeout(() => this.map.invalidateSize(), 300);
+  },
+
+  setView(lat, lng, zoom) {
+    this.map.setView([lat, lng], zoom);
+  },
+
+  /** 現在のフィルタ・モードでホットスポットを再描画 */
+  plot() {
+    if (this.firmsLayer) this.map.removeLayer(this.firmsLayer);
+    this.firmsLayer = L.layerGroup();
+
+    State.filteredRows().forEach(r => {
+      const color = Utils.colorByDays(r._daysAgo);
+      const lat   = parseFloat(r.latitude);
+      const lng   = parseFloat(r.longitude);
+      const layer = State.displayMode === 'polygon'
+        ? this._makePolygon(lat, lng, color, r._source)
+        : this._makeMarker(lat, lng, color);
+
+      layer.bindPopup(
+        `<strong>HOTSPOT (JST)</strong><br>日付: ${r.acq_date}<br>時刻: ${r.acq_time}<br>FRP: ${r.frp} MW`
+      );
+      this.firmsLayer.addLayer(layer);
+    });
+
+    this.firmsLayer.addTo(this.map);
+  },
+
+  _makePolygon(lat, lng, color, source) {
+    const s = source?.includes('MODIS') ? CONFIG.PIXEL_SIZE.MODIS : CONFIG.PIXEL_SIZE.DEFAULT;
+    return L.rectangle(
+      [[lat - s, lng - s], [lat + s, lng + s]],
+      { color: '#000', weight: 0.1, opacity: 0.2, fillColor: color, fillOpacity: 0.85 }
+    );
+  },
+
+  _makeMarker(lat, lng, color) {
+    return L.circleMarker([lat, lng], {
+      radius: 7, color: '#fff', weight: 1, fillColor: color, fillOpacity: 1,
+    });
+  },
+};
+
+/* ======================================================
+   UI コントローラー (UIController)
+   - DOM 操作・イベント登録をまとめる
+   ====================================================== */
+const UIController = {
+  _toastTimer: null,
+
+  init() {
+    // 表示モード切替
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        State.setDisplayMode(btn.dataset.mode);
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        MapView.plot();
+      });
+    });
+
+    // プリセットズーム
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        MapView.setView(+btn.dataset.lat, +btn.dataset.lng, +btn.dataset.zoom);
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // 日付変更 → キャッシュ済み JSON から再フィルタするだけ（再取得不要）
+    document.getElementById('end-date').addEventListener('change', () => {
+      State.setActiveDate(null);
+      document.getElementById('tl-all').classList.add('active');
+      App.loadData();   // forceReload=false: JSON キャッシュ内で日付フィルタ
+    });
+
+    // データ取得（強制リロード: キャッシュを無視して最新 JSON を再取得）
+    document.getElementById('btn-reload').addEventListener('click', () => {
+      App.loadData(true);
+    });
+
+    // CSV出力
+    document.getElementById('btn-csv').addEventListener('click', () => {
+      this.exportCSV();
+    });
+
+    // ALL ボタン
+    document.getElementById('tl-all').addEventListener('click', () => {
+      State.setActiveDate(null);
+      document.querySelectorAll('.timeline-day').forEach(el => el.classList.remove('active'));
+      document.getElementById('tl-all').classList.add('active');
+      MapView.plot();
+      this.updateStats();
+    });
+
+    // モバイルメニュー
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('sidebar-toggle').addEventListener('click', () => {
+      sidebar.classList.toggle('active');
+    });
+    MapView.map.on('click', () => {
+      if (window.innerWidth <= 768) sidebar.classList.remove('active');
+    });
+  },
+
+  /** タイムラインバーを（再）構築する */
+  syncTimeline() {
+    const endDateStr = document.getElementById('end-date').value;
+    const bar = document.getElementById('timeline-bar');
+    bar.innerHTML = '';
+
+    const endDate = Utils.parseDate(endDateStr);
+    for (let i = CONFIG.DAYS - 1; i >= 0; i--) {
+      const d  = new Date(endDate.getTime() - i * CONFIG.MS_PER_DAY);
+      const ds = Utils.formatDate(d);
+
+      const dayEl = document.createElement('div');
+      dayEl.className = 'timeline-day';
+      dayEl.id = `td-${ds}`;
+      dayEl.innerHTML = `
+        <div class="timeline-day-count" id="count-${ds}">0</div>
+        <div>${d.getMonth() + 1}/${d.getDate()}</div>
+      `;
+      dayEl.addEventListener('click', () => {
+        State.setActiveDate(ds);
+        document.querySelectorAll('.timeline-day').forEach(el => el.classList.remove('active'));
+        document.getElementById('tl-all').classList.remove('active');
+        dayEl.classList.add('active');
+        MapView.plot();
+        this.updateStats();
+      });
+      bar.appendChild(dayEl);
+    }
+    this.updateCounts();
+  },
+
+  /** 各日のカウントバッジを更新 */
+  updateCounts() {
+    const counts = {};
+    State.rows.forEach(r => { counts[r.acq_date] = (counts[r.acq_date] || 0) + 1; });
+
+    document.querySelectorAll('.timeline-day-count').forEach(el => {
+      const ds = el.closest('.timeline-day').id.replace('td-', '');
+      const c  = counts[ds] || 0;
+      el.textContent = c;
+      el.classList.toggle('has', c > 0);
+    });
+  },
+
+  /** 統計パネルを更新 */
+  updateStats() {
+    document.getElementById('st-total').textContent   = State.rows.length;
+    document.getElementById('st-current').textContent = State.filteredRows().length;
+    document.getElementById('st-time').textContent    =
+      new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  },
+
+  /** トースト表示（複数呼び出し時は既存タイマーをキャンセル） */
+  showToast(html) {
+    const el = document.getElementById('toast');
+    el.innerHTML = html;
+    el.classList.add('show');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+  },
+
+  /** 現在のデータを CSV としてダウンロード */
+  exportCSV() {
+    if (!State.rows.length) return;
+    const csv = [
+      Object.keys(State.rows[0]).join(','),
+      ...State.rows.map(r => Object.values(r).join(',')),
+    ].join('\n');
+    const a = document.createElement('a');
+    a.href     = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'wildfire_jst.csv';
+    a.click();
+  },
+};
+
+/* ======================================================
+   アプリケーション (App)
+   - 初期化とデータ取得フローを統括
+   ====================================================== */
+const App = {
+  async init() {
+    MapView.init();
+    UIController.syncTimeline();
+    UIController.init();
+    await this.loadData();
+  },
+
+  async loadData(forceReload = false) {
+    const endDateStr = document.getElementById('end-date').value;
+
+    // 日付が空・不正な場合はガード
+    if (!endDateStr || isNaN(Utils.parseDate(endDateStr).getTime())) {
+      UIController.showToast('⚠ 有効な日付を入力してください');
+      return;
+    }
+
+    UIController.showToast('<span class="spin"></span> データを読み込み中...');
+
+    try {
+      // GitHub Actions が生成した静的 JSON を取得（同一オリジン・CORS なし）
+      const payload = await DataAPI.load(forceReload);
+      const rows    = DataAPI.filterByDate(payload, endDateStr);
+
+      if (rows.length === 0) {
+        State.setRows(generateDemoData(endDateStr));
+        UIController.showToast('⚠ 該当データなし。デモデータを表示します');
+      } else {
+        State.setRows(rows);
+        const updatedAt = payload.fetched_at
+          ? `（更新: ${payload.fetched_at.slice(0, 16).replace('T', ' ')} JST）`
+          : '';
+        UIController.showToast(`✓ ${rows.length} 件読み込み完了 ${updatedAt}`);
+      }
+    } catch (err) {
+      console.error('[App.loadData]', err);
+      State.setRows(generateDemoData(endDateStr));
+      UIController.showToast('⚠ JSON 読み込みエラー。デモデータを表示します');
+    }
+
+    // タイムライン・地図・統計をまとめて更新
+    State.setActiveDate(null);
+    document.querySelectorAll('.timeline-day').forEach(el => el.classList.remove('active'));
+    document.getElementById('tl-all').classList.add('active');
+    UIController.syncTimeline();
+    MapView.plot();
+    UIController.updateStats();
+  },
+};
+
+/* ======================================================
+   エントリーポイント
+   ====================================================== */
+window.addEventListener('load', () => App.init());
+</script>
+</body>
+</html>
