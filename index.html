@@ -456,10 +456,19 @@ body, html {
 const CONFIG = {
   FIRMS_KEY:    '256135fddc6880125a19f6b864539dcc',
   AREA:         '122,24,146,46',
-  DAYS:         7,
+  DAYS:         7,          // 表示したい合計日数（UIのタイムライン幅）
+  CHUNK_DAYS:   5,          // FIRMS API の1リクエスト上限（最大5日）
   DEFAULT_VIEW: { lat: 39.360, lng: 141.902, zoom: 12 },
   JST_OFFSET_MS: 9 * 60 * 60 * 1000,   // +09:00
   MS_PER_DAY:    86_400_000,
+
+  // CORSプロキシ設定
+  // ブラウザから FIRMS を直接 fetch すると CORS エラーになるため経由する
+  // 先頭のプロキシが失敗したら次へ自動フォールバック
+  CORS_PROXIES: [
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  ],
 
   // 衛星別のピクセルサイズ (度)
   PIXEL_SIZE: {
@@ -563,31 +572,96 @@ const State = {
    - NASA FIRMS へのアクセスを担当
    ====================================================== */
 const FirmsAPI = {
-  buildUrl(source, endDate) {
+  /** FIRMS の生URL（CORSプロキシなし）を組み立てる */
+  buildRawUrl(source, chunkDays, dateStr) {
     return [
       'https://firms.modaps.eosdis.nasa.gov/api/area/csv',
       CONFIG.FIRMS_KEY,
       source,
       CONFIG.AREA,
-      CONFIG.DAYS,
-      endDate,
+      chunkDays,
+      dateStr,
     ].join('/');
   },
 
-  /** 1ソース分を fetch してパース済み行を返す */
+  /**
+   * CORSプロキシ経由で fetch し、失敗したら次のプロキシへフォールバック。
+   * すべて失敗した場合は最後のエラーを throw する。
+   */
+  async fetchWithProxy(rawUrl) {
+    let lastErr;
+    for (const proxy of CONFIG.CORS_PROXIES) {
+      try {
+        const res = await fetch(proxy(rawUrl), { signal: AbortSignal.timeout(15_000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        // プロキシがエラーJSONを返す場合（allorigins等）を除外
+        if (text.trimStart().startsWith('{') || text.trimStart().startsWith('<')) {
+          throw new Error('proxy returned non-CSV response');
+        }
+        return text;
+      } catch (e) {
+        console.warn(`[FirmsAPI] proxy failed (${proxy(rawUrl).slice(0, 60)}...):`, e.message);
+        lastErr = e;
+      }
+    }
+    throw lastErr;
+  },
+
+  /**
+   * 1ソース・7日分をAPIの上限（5日）以内に分割してリクエストし、
+   * パース済み行を返す。
+   *
+   *  endDate を基点に:
+   *    chunk A: endDate - 6日 〜 endDate - 2日 (5日分, CHUNK_DAYS=5)
+   *    chunk B: endDate - 1日 〜 endDate       (2日分)
+   */
   async fetchSource(source, endDate) {
-    const res = await fetch(this.buildUrl(source, endDate));
-    if (!res.ok) throw new Error(`HTTP ${res.status} for ${source}`);
-    const text = await res.text();
-    return Utils.parseCSV(text).map(r => {
-      const jst = Utils.utcToJST(r.acq_date, r.acq_time);
-      return {
-        ...r,
-        acq_date: jst.date,
-        acq_time: jst.time,
-        _source:  source,
-        _daysAgo: Utils.daysDiff(jst.date, endDate),
-      };
+    const end   = Utils.parseDate(endDate);
+    const total = CONFIG.DAYS;         // 7
+    const chunk = CONFIG.CHUNK_DAYS;   // 5
+
+    // 必要なチャンクを逆順（新しい → 古い）で計算
+    const chunks = [];
+    for (let offset = 0; offset < total; offset += chunk) {
+      const days      = Math.min(chunk, total - offset);          // このチャンクの日数
+      const chunkEnd  = new Date(end.getTime() - offset * CONFIG.MS_PER_DAY);
+      chunks.push({ dateStr: Utils.formatDate(chunkEnd), days });
+    }
+
+    // 各チャンクを fetch（並列）
+    const results = await Promise.allSettled(
+      chunks.map(({ dateStr, days }) =>
+        this.fetchWithProxy(this.buildRawUrl(source, days, dateStr))
+          .then(text => Utils.parseCSV(text))
+      )
+    );
+
+    const rows = [];
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') {
+        r.value.forEach(row => {
+          const jst = Utils.utcToJST(row.acq_date, row.acq_time);
+          rows.push({
+            ...row,
+            acq_date: jst.date,
+            acq_time: jst.time,
+            _source:  source,
+            _daysAgo: Utils.daysDiff(jst.date, endDate),
+          });
+        });
+      } else {
+        console.warn(`[FirmsAPI] chunk ${i} of ${source} 取得失敗:`, results[i].reason);
+      }
+    });
+
+    // 同一座標・同一時刻の重複を除去（チャンク境界で重複する可能性あり）
+    const seen = new Set();
+    return rows.filter(r => {
+      const key = `${r.latitude},${r.longitude},${r.acq_date},${r.acq_time}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
   },
 
