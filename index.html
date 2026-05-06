@@ -741,9 +741,11 @@ const UIController = {
       });
     });
 
-    // 日付変更 → タイムライン更新
+    // 日付変更 → State・タイムラインをリセットしてデータ再取得
     document.getElementById('end-date').addEventListener('change', () => {
-      this.syncTimeline();
+      State.setActiveDate(null);                          // 選択日付をリセット
+      document.getElementById('tl-all').classList.add('active'); // ALLボタンをアクティブに
+      App.loadData();                                     // 新しい日付でデータを再取得
     });
 
     // データ取得
@@ -864,7 +866,20 @@ const App = {
 
   async loadData() {
     const endDateStr = document.getElementById('end-date').value;
-    const sources    = [...document.querySelectorAll('.src-cb:checked')].map(c => c.value);
+
+    // 日付が空・不正な場合はガード
+    if (!endDateStr || isNaN(Utils.parseDate(endDateStr).getTime())) {
+      UIController.showToast('⚠ 有効な日付を入力してください');
+      return;
+    }
+
+    const sources = [...document.querySelectorAll('.src-cb:checked')].map(c => c.value);
+
+    // ソースが未選択の場合もガード
+    if (sources.length === 0) {
+      UIController.showToast('⚠ 衛星ソースを1つ以上選択してください');
+      return;
+    }
 
     UIController.showToast('<span class="spin"></span> 大槌町周辺データを取得中...');
 
@@ -884,7 +899,10 @@ const App = {
       UIController.showToast('⚠ 取得エラー。デモデータを表示します');
     }
 
-    // タイムライン・地図・統計をまとめて更新
+    // タイムライン・地図・統計をまとめて更新（activeDate は loadData 開始前にリセット済み）
+    State.setActiveDate(null);
+    document.querySelectorAll('.timeline-day').forEach(el => el.classList.remove('active'));
+    document.getElementById('tl-all').classList.add('active');
     UIController.syncTimeline();
     MapView.plot();
     UIController.updateStats();
